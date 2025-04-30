@@ -416,12 +416,12 @@ Paolo e Fabio sembrano avere gli stessi bit.
 \end{lstlisting}
 Essendo che i primi 100 bit sono uguali, Fabio e Paolo possono essere abbastanza sicuri
 che anche i rimanenti bit corrispondono. Ora, devono scartare i primi 100 bit, per essere sicuri che
-Amos potrebbe avere ascoltato la loro condivisione.
+Amos non li conosca.
 \begin{lstlisting}[language=Python]
 fabio_bits = fabio_bits[100:] 
 paolo_bits = paolo_bits[100:] 
 \end{lstlisting}
-A questo punto, i bit rimanenti sono la \textbf{chiave} che verrà usata per creare
+A questo punto, i bit rimanenti saranno la \textbf{chiave} che verrà usata per creare
 il canale di comunicazione criptato. Ora possono comunicare in libertà senza avere paura che la
 loro conversazione venga letta da qualcun altro.
 \begin{lstlisting}[language=Python]
@@ -492,7 +492,7 @@ Ora prendiamo il prodotto interno di entrambi gli output:
 \[
 \langle \psi | \phi \rangle^2 = \langle \psi | \phi \rangle  \langle \psi | \phi \rangle
 \]
-Ma perché $U$ è un operatore unitario, abbiamo che dovrebbe preservare i prodotti interni.
+Poiché $U$ è un operatore unitario, abbiamo che dovrebbe preservare i prodotti interni.
 (Le probabilità totale deve rimanere 1 e le operazioni unitarie devono essere reversabili)
 di conseguenza il prodotto interno tra gli stati di input deve essere uguale al prodotto interno tra gli stati di output:
 \[\langle \psi | \phi \rangle = \langle \psi | \phi \rangle^2 \]

@@ -295,5 +295,264 @@ print("etc.")
 \end{lstlisting}
 
 \subsection{Trasmissione}
+
+Normalmente, i qubit dovrebbero essere inviati attraverso un canale di comunicazione
+quantistico, ma essendo che non è possibile avere accesso ad una cosa del genere nel mondo reale,
+per semplicità Fabio inserirà i qubit codificati in una lista chiamata \texttt{CANALE\_QUANTISTICO}.
+Ovviamente, proprio come un cavo a fibra ottica, il canale quantistico può essere intercettato
+da un attaccante.
+\begin{lstlisting}[language=Python]
+CANALE_QUANTISTICO = encoded_qubits 
+\end{lstlisting}
+
+\subsection{Misuramento}
+
+Il passo successivo per Paolo è quello di ricevere i qubit codificati e misurarli.
+Prima di tutto, Paolo deve scegliere una serie di basi casuali, proprio come ha fatto Fabio in precedenza.
+\begin{lstlisting}[language=Python]
+paolo_bases = generate_random_bases(KEY_LENGTH)
+
+print("Le basi che Paolo usa sono: " + paolo_bases[:10] + "...")
+\end{lstlisting}
+Le basi che Paolo usa sono: XXZZZXZXZZ...\\
+Successivamente, Paolo deve misurare ogni qubit nella base che ha scelto.
+In Qiskit, la misurazione di un qubit è rappresentata da una porta \( M \) che
+andremo ad inserire per ogni qubit. Tuttavia, dobbiamo stare attenti:
+Qiskit non permette di misurare un qubit in una base diversa da quella \( Z \), quindi
+dobbiamo prima applicare la porta \( H \) per trasformare il qubit dalla base \( Z \) alla
+base \( X \).
+\begin{lstlisting}[language=Python]
+def measure(qubits, bases):
+"""Questa funzione misura ogni qubit nella base corrispondente scelta per esso."""
+
+bits = "" 
+
+for qubit, basis in zip(qubits, bases):
+
+    #  Aggiungere un misuramento dipendentemente dalla base
+    if basis == "Z":
+        qubit.measure(0, 0)
+    elif basis == "X":
+        qubit.h(0)
+        qubit.measure(0, 0)
+
+    # Eseguire sul simulatore
+    simulator = Aer.get_backend('qasm_simulator')
+    result = execute(qubit, backend=simulator, shots=1).result()
+    counts = result.get_counts()
+    measured_bit = max(counts, key=counts.get) 
+
+    bits += measured_bit
     
-\end{document}
+return bits
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+qubits_received = CANALE_QUANTISTICO # Paolo riceve i bit dal canale quantistico
+paolo_bits = measure(qubits_received, paolo_bases)
+
+print("I primi bit che Paolo ha ricevuto sono: " + bob_bits[:10] + "...")  
+\end{lstlisting}
+I primi bit che Paolo ha ricevuto sono: 1010010011...
+
+\subsection{Comparazione}
+
+Ora, Fabio deve comunicare a Paolo le basi che ha scelto per codificare i suoi qubit. 
+Lo può fare attraverso qualsiasi canale di comunicazione classico. Il bello di questo protocollo
+è che non importa se Amos sa quali basi sono state usate. Fabio potrebbe persino pubblicare queste basi
+su un forum pubblico!
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1\textwidth]{post.png}
+  \label{fig:post}
+\end{figure}
+
+\begin{lstlisting}[language=Python]
+CANALE_CLASSICO = fabio_bases # Fabio comunica a Paolo le basi che ha utilizzato
+\end{lstlisting}
+Per ogni qubit dove Fabio e Paolo hanno scelto basi diverse, ci sta un $50\%$ che la
+misurazione di Paolo ritorni il qubit errato. 
+Per esempio, se Fabio invia a Paolo in qubit nello stato $\ket{+}$ (quindi un bit 
+0 codificato nella base $X$), e Paolo lo misura nella base \( Z \), ci sta una probabilità
+nel $50\%$ che otterrà $\ket{0}$ e il $50\%$ che otterrà $\ket{1}$.
+Di conseguenza, ogni istanza dove le loro basi non corrispondono è inutile: Paolo deve
+trovare le base che ha in comune con Fabio.
+\begin{lstlisting}[language=Python]
+common_bases = [i for i in range (KEY_LENGTH) if CANALE_CLASSICO[i] == paolo_bases[i]]
+
+print("Gli indici delle prime dieci basi in comune sono: " + str(common_bases[:10]))
+\end{lstlisting}
+Gli indici delle prime dieci basi in comune sono: [2, 4, 9, 10, 11, 12, 20, 24, 26, 27].\\
+Ora che Paolo sa le basi in comune, può scartare tutti i bit che non corrispondono con le sue basi
+e mantenere solo quelli che invece condividono.
+\begin{lstlisting}[language=Python]
+paolo_bits = [paolo_bits[index] for index in common_bases]
+\end{lstlisting}
+Inoltre comunica a Fabio quali basi avevano in comune così che anche lui a sua volta, 
+possa scartare il resto dei bit, mantenendo solo quelli che ha in comune con Paolo.
+\begin{lstlisting}[language=Python]
+CANALE_CLASSICO = common_bases # Paolo comunica a Fabio le basi in comune
+\end{lstlisting}
+\begin{lstlisting}
+fabio_bits = [fabio_bits[index] for index in common_bases]
+\end{lstlisting}
+Essendo che sia Fabio che Paolo mantengono solo i bit misurati con la basi che condividono
+\textit{dovrebbero} avere gli stessi bit. Per essere sicuri che questo sia il caso,
+Fabio annuncierà i primi bit che ha e Paolo dovrebbe avere gli stessi. 
+Ovviamente se Amos provasse ad origliare, anche lui verrebbe a conoscenza dei primi bit,
+quindi Fabio e Paolo dovranno successivamente scartarli (solo dopo averli confrontati,
+per essere sicuri che abbiano gli stessi bit come previsto). 
+\begin{lstlisting}[language=Python]
+CANALE_CLASSICO = fabio_bits[:100] 
+
+# Paolo controlla se i primi 100 bit di Fabio corrispondono con i suoi primi 100 bit
+if CANALE_CLASSICO == paolo_bits[:100]:
+    print("Paolo e Fabio sembrano avere gli stessi bit.")
+else:
+    print("Almeno un bit e' risultato diverso.")
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+Paolo e Fabio sembrano avere gli stessi bit.
+\end{lstlisting}
+Essendo che i primi 100 bit sono uguali, Fabio e Paolo possono essere abbastanza sicuri
+che anche i rimanenti bit corrispondono. Ora, devono scartare i primi 100 bit, per essere sicuri che
+Amos potrebbe avere ascoltato la loro condivisione.
+\begin{lstlisting}[language=Python]
+fabio_bits = fabio_bits[100:] 
+paolo_bits = paolo_bits[100:] 
+\end{lstlisting}
+A questo punto, i bit rimanenti sono la \textbf{chiave} che verrà usata per creare
+il canale di comunicazione criptato. Ora possono comunicare in libertà senza avere paura che la
+loro conversazione venga letta da qualcun altro.
+\begin{lstlisting}[language=Python]
+key = "" 
+for bit in fabio_bits: # O paolo_bits essendo che dovrebbero essere gli stessi.
+    key += bit
+
+print("Shhh, la chiave e':")
+print(str(key))
+print("Non dirlo a nessuno!")
+
+print("\nLa chiave e' lunga" + str(len(key)) + " bit.")
+\end{lstlisting}
+
+\subsection{Intercettazione} 
+
+Fino ad ora abbiamo considerato che Amos non sia riuscito ad intercettare i qubit, ma cosa
+succederebbe se invece ci riuscisse? Vediamo il caso nel dettaglio:\\
+Come sempre, Fabio genera una sequenza casuale di basi per codificare i suoi bit.
+Successivamente invia questi qubit a Paolo attraverso il canale quantistico.
+\begin{lstlisting}[language=Python]
+fabio_bits = ""
+for i in range(KEY_LENGTH):
+    randBit = random.randint(0, 1) 
+    fabio_bits += str(randBit) 
+ 
+fabio_bases = generate_random_bases(KEY_LENGTH)
+
+encoded_qubits = encode(fabio_bits, fabio_bases)
+
+CANALE_QUANTISTICO = encoded_qubits
+\end{lstlisting}
+
+\subsubsection{Allarme! Amos ha intercettato i qubit!}
+
+Questa volta i qubit vengono intercettati da Amos. 
+Vediamo cosa farebbe. Prima di tutto, lui sceglie casualmente una serie di basi
+per misurare i qubit (dato che non ha idea di quali basi abbia usato Fabio).
+Poi, esegue le misurazioni. Questo è simile a quello che farebbe Paolo normalmente.
+\begin{lstlisting}[language=Python]
+qubits_intercepted = CANALE_QUANTISTICO # Intercetta i qubit
+amos_bases = generate_random_bases(KEY_LENGTH) 
+amos_bits = measure(qubits_intercepted, eve_bases) 
+\end{lstlisting}
+A causa del teorema del no-cloning quantistico, Amos non può semplicemente duplicare esattamente 
+i qubit che stanno venendo inviati sul canale quantistico. Di conseguenza, Paolo non riceverà mai 
+i qubit originali rendendo ovvio che Amos ha intercettato i qubit.
+
+\subsubsection{Teorema del no-cloning}
+
+Partiamo dalle basi per poter capire al meglio il teorema del no-cloning.\\
+Uno stato quantistico $\ket{\psi}$ può essere rappresentato come una combinazione lineare di stati:
+\[
+\ket{\psi} = \alpha \ket{0} + \beta \ket{1} \]
+dove $\alpha$ e $\beta$ sono numeri complessi tali che $|\alpha|^2 + |\beta|^2 = 1$ (normalizzati).
+In questo momento si dice che il qubit è in una superposizione di due stati.\\
+Quello che dice il teorema del no-cloning è che non esiste un operatore (o trasformazione) universale unitario $U$ tale che
+\[\ket{\psi} \otimes \ket{e} \rightarrow \ket{\psi} \otimes \ket{\psi}\]
+per qualsiasi input arbitrario (nel nostro caso, sono i bit sono all'interno del canale quantistico) $\ket{\psi}$, dove $\ket{e}$ è uno stato iniziale del sistema da clonare qualsiasi (per esempio $\ket{0})$.\\
+In altre parole \textbf{non esiste un processo tale che possa duplicare uno stato quantistico sconosciuto}.
+
+\subsubsection*{Dimostrazione del teorema del no-cloning}
+
+Supponiamo per assurdo che invece \textit{esista} un operatore $U$ tale che
+\[U(\ket{\psi} \otimes \ket{e}) = \ket{\psi} \otimes \ket{\psi}\]
+\[U(\ket{\phi} \otimes \ket{e}) = \ket{\phi} \otimes \ket{\phi}\]
+Ora prendiamo il prodotto interno di entrambi gli output:
+\[
+\langle \psi | \phi \rangle^2 = \langle \psi | \phi \rangle  \langle \psi | \phi \rangle
+\]
+Ma perché $U$ è un operatore unitario, abbiamo che dovrebbe preservare i prodotti interni.
+(Le probabilità totale deve rimanere 1 e le operazioni unitarie devono essere reversabili)
+di conseguenza il prodotto interno tra gli stati di input deve essere uguale al prodotto interno tra gli stati di output:
+\[\langle \psi | \phi \rangle = \langle \psi | \phi \rangle^2 \]
+ricordiamo che:
+\[\langle \psi | \phi \rangle = \begin{pmatrix}
+  \psi_1 & \psi_2 & \dots & \psi_n 
+\end{pmatrix} \begin{pmatrix}
+  \phi_1 \\
+  \phi_2 \\
+  \vdots \\
+  \phi_n
+\end{pmatrix} = \psi_1\phi_1 + \psi_2\phi_2 + \dots + \psi_n\phi_n\]
+L'equazione è vera soltanto se 
+\begin{itemize}
+  \item $\langle \psi | \phi \rangle = 0$ (stati ortogonali) oppure
+  \item $\langle \psi | \phi \rangle = 1$ (stati identici)
+\end{itemize}
+Questo vuol dire che solo stati ortogonali e stati identici possono essere clonati, ma non stati arbitrari.
+Essendo che la maggior parte di stati quantistici non sono nè ortogonali nè identici, arriviamo ad una contraddizione.
+Allora il teorema del no-cloning è vero e non esiste un operatore universale unitario $U$ tale che possa clonare uno stato quantistico sconosciuto. $\square$
+
+\subsubsection{Piano dell'intercettatore}
+
+Per evitare che venga scoperto, Amos deve seguire un piano. Deve inviare una serie di qubit
+"sostituti" da mandare a Paolo. Essendo che non ha idea di quali basi abbia usato,
+anche lui deve generare una serie di basi casuali. Per semplicità 
+assumiamo che Amos usi le stesse basi che ha usato per intercettare i qubit siano gli stessi
+che usa per codificare i bit di esca.
+\begin{lstlisting}[language=Python]
+CANALE_QUANTISTICO = encode(amos_bits, amos_bases) # Invia i qubit a Paolo
+\end{lstlisting}
+Poi Paolo riceve i qubit e li misura nella base che ha scelto. Non sa che Amos li ha intercettati.
+Dopodiché Fabio ha bisogno di sapere in quali basi Paolo ha codificato i qubit che ha ricevuto. 
+Glieli può comunicare attraverso qualsiasi canale di comunicazione classico. Essendo questo canale pubblico
+anche Amos saprà le basi che Paolo ha usato.
+\begin{lstlisting}
+CANALE_CLASSICO = fabio_bases
+\end{lstlisting}
+Come al solito, Paolo controlla quali basi ha in comune con Fabio. Scarta quelle che non coincidono e mantiene quelle che invece lo fanno.
+Successivamente comunica a Fabio le basi che ha in comune con lui.
+
+\subsubsection*{Risultato finale}
+
+Essendo che Paolo e Fabio hanno ora solo i qubit misurati con le basi in comune, dovrebbero possedere gli stessi bit.
+Per fare sì che questo sia il caso, Fabio annuncerà i primi 100 bit che ha e Paolo dovrebbe avere gli stessi.
+\begin{lstlisting}[language=Python]
+CANALE_CLASSICO = fabio_bits[:100] 
+
+# Paolo controlla se i primi 100 bit di Fabio corrispondono con i suoi primi 100 bit
+if CANALE_CLASSICO == paolo_bits[:100]:
+    print("Paolo e Fabio sembrano avere gli stessi bit.")
+else:
+    print("Almeno un bit e' risultato diverso.")
+\end{lstlisting}
+\textbf{Almeno un bit e' risultato diverso.} Dopo aver confrontato i primi 100 bit, Fabio e Paolo
+si rendono conto che i loro bit non corrispondono. Assumendo che non ci sia nessun rumore nel canale quantistico,
+Fabio e Paolo sono sicuri che il loro canale di comunicazione quantistico è stato intercettato da Amos.
+Di conseguenza decidono di non utilizzare la chiave e di ripetere il protocollo. La prossima volta
+potrebbero provare a utilizzare un canale di comunicazione quantistico diverso o più sicuro, così che
+Amos non possa intercettare i qubit.
+
+
+ \end{document}

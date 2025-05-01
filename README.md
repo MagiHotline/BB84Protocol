@@ -1,2 +1,2 @@
 # BB84Protocol
-Relazione sul protocollo BB84
+[Relazione](./bb84.pdf) sul protocollo BB84
